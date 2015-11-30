@@ -8,7 +8,8 @@ var Scrollpoints = (function (undefined) {
         once: true,
         reversed: false,
         when: 'entered', // 'entered', 'entering', 'left', 'leaving'
-        offset: 0
+        offset: 0,
+        activeInitially: true
     };
 
     var extendOptions = function (userOptions) {
@@ -107,17 +108,15 @@ var Scrollpoints = (function (undefined) {
 
 
             if (elem.active && shouldFire) {
+                console.log('fire', elem.element.classList, elem.when, elem.reversed ? ' reversed': '');
                 elem.callback.call(window, elem.element);
+
                 elem.done = true;
 
-                setTimeout(function () { // modify array after forEach finishes.
-                    if (!elem.once) {
-                        // add a scrollpoint which triggers at the opposite position and reactivates the current one.
-                        // example: A scrollpoint triggers when leaving at the top of the screen, is then temporarily
-                        // deactivated and gets reactivated when the element comes back in from the top (its lower edge)
-                        exports.add(elem.element, function () { elem.done = false; }, {when: oppositeDirectionOf(elem.when), reversed: !elem.reversed});
-                    }
+                setTimeout(function () { // modify array after forEach finishes.#
+
                 });
+
             }
 
         });
@@ -128,27 +127,45 @@ var Scrollpoints = (function (undefined) {
 
         // reversed elements are inactive initially. Scrollpoints which trigger on 'left' or 'leave' will
         // be activated once they entered the screen, those who trigger on 'entered' or 'entering' once they left the screen.
-        var activeInitially = true;
+        var sp = {
+                element: domElement,
+                callback: callback,
+
+                once: opts.once,
+                reversed: opts.reversed,
+                when: opts.when,
+                offset: opts.offset,
+
+                active: true,
+                done: false
+            };
+
+        var newOpts = {when: oppositeDirectionOf(opts.when), reversed: !opts.reversed, /*offset:-elem.offset,*/ active:false};
+
+        var spReversed;
 
         if ((opts.when === 'entered' || opts.when === 'entering') && opts.reversed ||
             (opts.when === 'left' || opts.when === 'leaving') && opts.reversed) {
-            activeInitially = false;
+            sp.active = false;
+        }
+        sp.sibling = spReversed;
+
+        scrollpoints.push(sp);
+
+
+        if (!opts.once) {
+            spReversed.sibling = sp;
+            // add a scrollpoint which triggers at the opposite position and reactivates the current one.
+            // example: A scrollpoint triggers when leaving at the top of the screen, is then temporarily
+            // deactivated and gets reactivated when the element comes back in from the top (its lower edge)
+            exports.add(elem.element, function () { sp.done = false; console.log('reactivated', sp.element.classList);}, newOpts);
+            console.log('added reverse', elem.element.classList, newOpts.when, newOpts.reversed, newOpts.offset, scrollpoints.length);
         }
 
-        scrollpoints.push({
-            element: domElement,
-            callback: callback,
 
-            once: opts.once,
-            reversed: opts.reversed,
-            when: opts.when,
-            offset: opts.offset,
-
-            active: activeInitially,
-            done: false
-        });
-
-        executeScrollpoints();
+        if (opts.activeInitially) {
+            executeScrollpoints();
+        }
     };
 
     exports.destroy = function() {
